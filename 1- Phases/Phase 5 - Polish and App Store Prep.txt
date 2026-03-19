@@ -1,0 +1,222 @@
+# FleetPulse Mobile — Phase 5: Polish + App Store
+
+═══════════════════════════════════════════════════════
+PART 1: PUSH NOTIFICATIONS
+═══════════════════════════════════════════════════════
+
+In app/(manager)/index.tsx, on first load:
+
+import * as Notifications from 'expo-notifications'
+import * as Device from 'expo-device'
+
+const registerForPushNotifications = async () => {
+  if (!Device.isDevice) return null
+  
+  const { status: existingStatus } = 
+    await Notifications.getPermissionsAsync()
+  
+  let finalStatus = existingStatus
+  if (existingStatus !== 'granted') {
+    const { status } = 
+      await Notifications.requestPermissionsAsync()
+    finalStatus = status
+  }
+  
+  if (finalStatus !== 'granted') return null
+  
+  const token = (await Notifications.getExpoPushTokenAsync()).data
+  
+  // Save token to Supabase profiles table
+  await supabase
+    .from('profiles')
+    .update({ push_token: token })
+    .eq('id', user.id)
+  
+  return token
+}
+
+Add push_token column to profiles table:
+ALTER TABLE profiles 
+ADD COLUMN IF NOT EXISTS push_token TEXT;
+
+Handle notification taps:
+Notifications.addNotificationResponseReceivedListener(
+  response => {
+    const data = response.notification.request.content.data
+    if (data.type === 'inspection_failed') {
+      router.push('/(manager)/inspections')
+    }
+  }
+)
+
+═══════════════════════════════════════════════════════
+PART 2: APP ICONS + SPLASH SCREEN
+═══════════════════════════════════════════════════════
+
+Create proper app icons:
+- assets/images/icon.png — 1024x1024, FleetPulse logo
+  on dark navy background (#0A0F1E)
+- assets/images/splash.png — 1284x2778, 
+  FleetPulse logo centered, navy background
+- assets/images/adaptive-icon.png — Android adaptive icon
+
+The icon should use the FleetPulse logo/wordmark
+on the navy background with a subtle blue glow.
+
+═══════════════════════════════════════════════════════
+PART 3: EAS BUILD CONFIGURATION
+═══════════════════════════════════════════════════════
+
+Create eas.json:
+
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your_apple_id@email.com",
+        "ascAppId": "your_app_store_connect_app_id",
+        "appleTeamId": "your_team_id"
+      },
+      "android": {
+        "serviceAccountKeyPath": 
+          "./google-play-service-account.json"
+      }
+    }
+  }
+}
+
+═══════════════════════════════════════════════════════
+PART 4: APP STORE LISTING FILE
+═══════════════════════════════════════════════════════
+
+Create APP_STORE_LISTING.md:
+
+# FleetPulse — App Store Listing
+
+## App Name
+FleetPulse
+
+## Subtitle (30 chars max)
+Modern Fleet Management
+
+## Description
+FleetPulse is the modern fleet management platform 
+built for logistics and delivery companies.
+
+Track vehicles, manage drivers, conduct digital 
+pre-trip inspections, and monitor your fleet health 
+— all from one intelligent dashboard.
+
+FEATURES:
+- Real-time vehicle tracking and oil change alerts
+- Digital pre-trip inspections with pass/fail checklists
+- Driver management with territory assignment
+- Fleet health score based on maintenance compliance
+- Issue reporting directly from driver mobile devices
+- Announcement system for management to drivers
+- Instant notifications for failed inspections
+
+Built for operations teams who need reliability, 
+speed, and clarity in managing their fleet.
+
+## Keywords
+fleet management, truck inspection, vehicle tracking, 
+driver management, logistics, delivery, maintenance, 
+pre-trip inspection, DOT compliance, fleet health
+
+## What's New (v1.0)
+Initial release of FleetPulse mobile app.
+
+## Screenshots needed
+1. Driver home screen (assigned vehicle)
+2. Pre-trip inspection checklist
+3. Manager fleet overview
+4. Fleet health dashboard
+5. Vehicle detail panel
+
+═══════════════════════════════════════════════════════
+PART 5: FINAL TESTING CHECKLIST
+═══════════════════════════════════════════════════════
+
+Test on physical iPhone before submitting:
+
+AUTH:
+□ Login as manager → lands on manager home
+□ Login as driver → lands on driver home
+□ Wrong password → shows error
+□ Sign out → returns to login
+
+MANAGER:
+□ Home KPI cards show real data
+□ Active alerts list correct vehicles
+□ Pull to refresh works
+□ Vehicles list loads + filters by territory
+□ Search filters vehicles in real time
+□ Tap vehicle → opens detail
+□ Vehicle detail tabs all work
+□ Assign driver from vehicle → works
+
+DRIVER:
+□ Assigned vehicle shows on home
+□ Start inspection → vehicle confirmation shows
+□ Odometer entry → continues
+□ Checklist → pass/fail works
+□ Fail without note → cannot advance
+□ Fail with note → can advance
+□ Category transition animates smoothly
+□ Summary shows correct pass/fail count
+□ Submit → success screen
+□ Inspection appears in manager view
+□ Report issue → bottom sheet opens
+□ Submit issue → appears in manager admin
+
+NOTIFICATIONS:
+□ Permission requested on first open
+□ Failed inspection triggers notification
+□ Tap notification → navigates correctly
+
+PERFORMANCE:
+□ No lag on vehicle list (57 vehicles)
+□ Inspection flow smooth on older iPhone
+□ Images load without blocking UI
+
+═══════════════════════════════════════════════════════
+PART 6: BUILD AND SUBMIT COMMANDS
+═══════════════════════════════════════════════════════
+
+# Login to Expo
+eas login
+
+# Build for TestFlight (iOS beta testing)
+eas build --platform ios --profile preview
+
+# Once tested and approved, production build
+eas build --platform ios --profile production
+
+# Submit to App Store
+eas submit --platform ios
+
+# Android preview build
+eas build --platform android --profile preview
+
+# Android production + submit
+eas build --platform android --profile production
+eas submit --platform android

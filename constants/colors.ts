@@ -1,0 +1,21 @@
+export const colors = {
+  bgBase: '#0A0F1E',
+  bgSurface: '#0F1629',
+  bgElevated: '#151D35',
+  borderDefault: 'rgba(255,255,255,0.08)',
+  borderHover: 'rgba(255,255,255,0.16)',
+  accent: '#3B82F6',
+  accentGlow: 'rgba(59,130,246,0.15)',
+  textPrimary: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  textMuted: '#64748B',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  navy950: '#040810',
+  navy900: '#0A0F1E',
+  navy800: '#0F1629',
+  navy700: '#151D35',
+  navy600: '#1E2A4A',
+}
+
