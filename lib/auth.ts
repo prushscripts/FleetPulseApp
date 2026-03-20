@@ -1,3 +1,4 @@
+import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 
 export async function signIn(email: string, password: string) {
@@ -9,6 +10,6 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
-  return supabase.auth.signOut()
+  await supabase.auth.signOut()
+  router.replace('/(auth)/login')
 }
-

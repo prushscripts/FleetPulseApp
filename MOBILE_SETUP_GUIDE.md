@@ -20,19 +20,42 @@ npm install
 ```
 
 ## Step 3 — Environment variables
-Create `.env` in the `FleetPulseApp` root:
+Create `.env` in the `FleetPulseApp` root (see `.env.example`):
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=same_as_web_app
 EXPO_PUBLIC_SUPABASE_ANON_KEY=same_as_web_app
+EXPO_PUBLIC_WEB_URL=https://your-nextjs-fleetpulse-url.vercel.app
 ```
 
 Use the **same Supabase project** as your web app (copy from your web app’s `.env.local`).
 
+`EXPO_PUBLIC_WEB_URL` must be the live **FleetPulse Next.js** URL so the mobile app can call `/api/driver-report-issue` (with your session token) and `/api/notifications/create` after failed inspections.
+
+## Step 3b — Push notifications (optional)
+Run `add-push-token.sql` (project root) in the Supabase SQL editor to add `profiles.push_token`, then rebuild the app after granting notification permission on device.
+
 ## Step 4 — Run on your phone
+
+**Same Wi‑Fi as your PC (simplest — no tunnel):**
 ```bash
+cd FleetPulseApp
 npx expo start
 ```
+Then press `s` to switch connection, or run:
+```bash
+npm run start:lan
+```
 Scan the QR code with the Expo Go app.
+
+**Tunnel** (different network / strict Wi‑Fi): `@expo/ngrok` is included as a **project** devDependency (`npm install`). Do **not** rely on a global install. Then:
+```bash
+npm run start:tunnel
+```
+
+If Metro env vars look wrong after editing `.env`, restart with a clean cache:
+```bash
+npx expo start --clear
+```
 
 ## Step 5 — Login to Expo
 ```bash
