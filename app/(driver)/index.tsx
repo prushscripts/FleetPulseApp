@@ -57,6 +57,38 @@ export default function DriverHome() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return
+
+    console.log('=== DRIVER DEBUG ===')
+    console.log('Auth user ID:', user?.id)
+    console.log('Auth user email:', user?.email)
+    console.log('user_metadata company_id:', user?.user_metadata?.company_id)
+
+    // Check what's in drivers table for this user
+    const { data: driverByUserId } = await supabase
+      .from('drivers')
+      .select('id, first_name, last_name, user_id, email, assigned_vehicle_id')
+      .eq('user_id', user?.id ?? '')
+      .maybeSingle()
+    console.log('Driver by user_id:', JSON.stringify(driverByUserId))
+
+    const { data: driverByEmail } = await supabase
+      .from('drivers')
+      .select('id, first_name, last_name, user_id, email, assigned_vehicle_id')
+      .eq('email', user?.email ?? '')
+      .maybeSingle()
+    console.log('Driver by email:', JSON.stringify(driverByEmail))
+
+    // Check what vehicles are assigned to this driver
+    if (driverByEmail?.id) {
+      const { data: vehicleCheck } = await supabase
+        .from('vehicles')
+        .select('id, code, driver_id, assigned_driver_id')
+        .or(`driver_id.eq.${driverByEmail.id},assigned_driver_id.eq.${driverByEmail.id}`)
+        .maybeSingle()
+      console.log('Vehicle for driver:', JSON.stringify(vehicleCheck))
+    }
+    console.log('=== END DEBUG ===')
+
     const n = (user.user_metadata?.nickname as string | undefined)?.trim()
     setNickname(n || user.email?.split('@')[0] || 'there')
 
