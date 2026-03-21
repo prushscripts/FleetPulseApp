@@ -7,13 +7,15 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  StatusBar,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import Skeleton from '@/components/ui/Skeleton'
 import { supabase } from '@/lib/supabase'
+import AppHeader from '@/components/ui/AppHeader'
+import { getCompanyId } from '@/lib/getCompanyId'
 
 type VehicleRow = {
   id: string
@@ -40,7 +42,6 @@ function territoryOf(loc: string | null): 'New York' | 'DMV' | 'Other' {
 }
 
 export default function VehiclesIndex() {
-  const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
@@ -187,12 +188,10 @@ export default function VehiclesIndex() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgBase, paddingTop: insets.top + 8 }}>
+    <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
+      <StatusBar barStyle="light-content" />
+      <AppHeader title="Fleet Overview" subtitle={`${filtered.length} vehicles`} />
       <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: '800' }}>Fleet overview</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-          {vehicles.length} vehicles · Professional
-        </Text>
         <View
           style={{
             flexDirection: 'row',

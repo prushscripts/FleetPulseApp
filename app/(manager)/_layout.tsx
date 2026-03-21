@@ -1,3 +1,4 @@
+import { Platform } from 'react-native'
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
@@ -8,12 +9,16 @@ export default function ManagerTabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.bgBase,
+          backgroundColor: '#0A0F1E',
           borderTopColor: 'rgba(255,255,255,0.06)',
           borderTopWidth: 1,
-          paddingBottom: 8,
+          height: Platform.OS === 'ios' ? 84 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           paddingTop: 8,
-          height: 64,
+          paddingHorizontal: 8,
+        },
+        tabBarItemStyle: {
+          paddingHorizontal: 4,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: '#475569',
@@ -54,6 +59,8 @@ export default function ManagerTabLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="clipboard" size={size} color={color} />,
         }}
       />
+      <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="messages" options={{ href: null }} />
     </Tabs>
   )
 }

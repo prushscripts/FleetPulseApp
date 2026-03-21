@@ -37,8 +37,35 @@ function toVehicle(v: Record<string, unknown> | null): DriverVehicle | null {
   }
 }
 
+async function vehicleByDriverId(
+  supabase: SupabaseClient,
+  driverId: string,
+  assignedVehicleId: string | null,
+  vehicleSelect: string,
+): Promise<DriverVehicle | null> {
+  // Try direct assigned_vehicle_id first — fastest, most accurate
+  if (assignedVehicleId) {
+    const { data: v } = await supabase
+      .from('vehicles')
+      .select(vehicleSelect)
+      .eq('id', assignedVehicleId)
+      .maybeSingle()
+    const result = toVehicle(v as Record<string, unknown> | null)
+    if (result) return result
+  }
+  // Fallback: reverse lookup via vehicle FK columns
+  const { data: v } = await supabase
+    .from('vehicles')
+    .select(vehicleSelect)
+    .or(`driver_id.eq.${driverId},assigned_driver_id.eq.${driverId}`)
+    .limit(1)
+    .maybeSingle()
+  return toVehicle(v as Record<string, unknown> | null)
+}
+
 /**
  * Same 4-method lookup as web driver inspection (user_id, email, vehicle FK, profile company).
+ * Each method also tries assigned_vehicle_id before the reverse FK lookup.
  */
 export async function loadDriverVehicleContext(
   supabase: SupabaseClient,
@@ -48,103 +75,85 @@ export async function loadDriverVehicleContext(
   const nickname = (user.user_metadata?.nickname as string | undefined) || ''
   const displayName = nickname.trim() || (user.email ? user.email.split('@')[0] : 'Driver')
 
-  type DriverRow = { id: string }
+  type DriverRow = { id: string; assigned_vehicle_id: string | null }
   let driver: DriverRow | null = null
   let vehicleRow: DriverVehicle | null = null
 
   const vehicleSelect =
     'id, code, year, make, model, current_mileage, company_id, location, oil_change_due_mileage'
 
-  let { data: d1 } = await supabase.from('drivers').select('id').eq('user_id', user.id).maybeSingle()
-  driver = d1 as DriverRow | null
+  // METHOD 1: driver by user_id
+  const { data: d1 } = await supabase
+    .from('drivers')
+    .select('id, assigned_vehicle_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  driver = (d1 as DriverRow | null) ?? null
   if (driver) {
-    const { data: v } = await supabase
-      .from('vehicles')
-      .select(vehicleSelect)
-      .or(`driver_id.eq.${driver.id},assigned_driver_id.eq.${driver.id}`)
-      .limit(1)
-      .maybeSingle()
-    vehicleRow = toVehicle(v as Record<string, unknown> | null)
+    vehicleRow = await vehicleByDriverId(supabase, driver.id, driver.assigned_vehicle_id, vehicleSelect)
   }
 
+  // METHOD 2: driver by email
   if (!driver?.id || !vehicleRow) {
     const { data: d2 } = await supabase
       .from('drivers')
-      .select('id')
+      .select('id, assigned_vehicle_id')
       .eq('email', user.email ?? '')
       .limit(1)
       .maybeSingle()
     if (d2) driver = d2 as DriverRow
     if (driver && !vehicleRow) {
-      const { data: v } = await supabase
-        .from('vehicles')
-        .select(vehicleSelect)
-        .or(`driver_id.eq.${driver.id},assigned_driver_id.eq.${driver.id}`)
-        .limit(1)
-        .maybeSingle()
-      vehicleRow = toVehicle(v as Record<string, unknown> | null)
+      vehicleRow = await vehicleByDriverId(supabase, driver.id, driver.assigned_vehicle_id, vehicleSelect)
     }
   }
 
-  if (driver && !vehicleRow) {
+  // METHOD 3: vehicle directly assigned to user auth id (fallback if driver row missing)
+  if (!vehicleRow) {
     const { data: v } = await supabase
       .from('vehicles')
       .select(vehicleSelect)
-      .or(`driver_id.eq.${driver.id},assigned_driver_id.eq.${driver.id}`)
+      .or(`driver_id.eq.${user.id},assigned_driver_id.eq.${user.id}`)
       .limit(1)
       .maybeSingle()
     vehicleRow = toVehicle(v as Record<string, unknown> | null)
   }
 
+  // METHOD 4: profile company_id + email
   let companyId = cid
-  if (!driver && companyId) {
-    const { data: d4 } = await supabase
-      .from('drivers')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('email', user.email ?? '')
-      .maybeSingle()
-    if (d4) driver = d4 as DriverRow
-    if (driver && !vehicleRow) {
-      const { data: v } = await supabase
-        .from('vehicles')
-        .select(vehicleSelect)
-        .or(`driver_id.eq.${driver.id},assigned_driver_id.eq.${driver.id}`)
-        .limit(1)
+  if (!driver) {
+    const resolvedCid = companyId ?? null
+    const profileCid = await (async () => {
+      if (resolvedCid) return resolvedCid
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
         .maybeSingle()
-      vehicleRow = toVehicle(v as Record<string, unknown> | null)
-    }
-  }
+      return (profile as { company_id?: string } | null)?.company_id ?? null
+    })()
 
-  if (!driver && !companyId) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .maybeSingle()
-    const profileCompanyId = (profile as { company_id?: string } | null)?.company_id
-    if (profileCompanyId) {
-      companyId = profileCompanyId
+    if (profileCid) {
+      companyId = profileCid
       const { data: d4 } = await supabase
         .from('drivers')
-        .select('id')
-        .eq('company_id', profileCompanyId)
+        .select('id, assigned_vehicle_id')
+        .eq('company_id', profileCid)
         .eq('email', user.email ?? '')
         .maybeSingle()
       if (d4) driver = d4 as DriverRow
       if (driver && !vehicleRow) {
-        const { data: v } = await supabase
-          .from('vehicles')
-          .select(vehicleSelect)
-          .or(`driver_id.eq.${driver.id},assigned_driver_id.eq.${driver.id}`)
-          .limit(1)
-          .maybeSingle()
-        vehicleRow = toVehicle(v as Record<string, unknown> | null)
+        vehicleRow = await vehicleByDriverId(supabase, driver.id, driver.assigned_vehicle_id, vehicleSelect)
       }
     }
   }
 
   if (!companyId && vehicleRow?.company_id) companyId = vehicleRow.company_id
+
+  console.log('loadDriverVehicleContext result:', {
+    driverId: driver?.id ?? null,
+    vehicleCode: vehicleRow?.code ?? null,
+    companyId,
+  })
 
   return {
     driverId: driver?.id ?? null,

@@ -6,17 +6,17 @@ import {
   RefreshControl,
   Pressable,
   TouchableOpacity,
+  Alert,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import Card from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
 import Skeleton from '@/components/ui/Skeleton'
-import { signOut } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { useManagerPushRegistration } from '@/hooks/usePushRegistration'
+import * as Haptics from 'expo-haptics'
 
 type VehicleRow = {
   id: string
@@ -109,6 +109,28 @@ export default function ManagerHome() {
     setRefreshing(false)
   }
 
+  const handleProfile = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    router.push('/(manager)/profile' as any)
+  }
+
+  const handleSignOut = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.auth.signOut()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          router.replace('/(auth)/login' as any)
+        },
+      },
+    ], { userInterfaceStyle: 'dark' })
+  }
+
   const totalCount = vehicles.length
   const activeCount = vehicles.filter((v) => (v.status || 'active') === 'active').length
   const inShopCount = vehicles.filter((v) => v.status === 'in_shop').length
@@ -125,11 +147,40 @@ export default function ManagerHome() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24 }}
       >
-        <Text style={{ color: colors.textPrimary, fontSize: 26, fontWeight: '700' }}>
-          {greetingHour()}, {nickname}
-        </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: 6, fontSize: 15 }}>Here&apos;s your fleet today</Text>
-        <Text style={{ color: colors.textMuted, marginTop: 4, fontSize: 13 }}>{formatToday()}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 26, fontWeight: '700' }}>
+              {greetingHour()}, {nickname}
+            </Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 6, fontSize: 15 }}>
+              Here&apos;s your fleet today
+            </Text>
+            <Text style={{ color: colors.textMuted, marginTop: 4, fontSize: 13 }}>{formatToday()}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <TouchableOpacity
+              onPress={handleProfile}
+              style={{
+                padding: 8,
+                borderRadius: 10,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Ionicons name="person-circle-outline" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSignOut}
+              style={{
+                padding: 8,
+                borderRadius: 10,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                marginLeft: 2,
+              }}
+            >
+              <Ionicons name="log-out-outline" size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {loading ? (
           <View style={{ marginTop: 20, gap: 12 }}>
@@ -258,9 +309,6 @@ export default function ManagerHome() {
             </View>
           </>
         )}
-
-        <View style={{ height: 20 }} />
-        <Button label="Sign out" onPress={() => void signOut()} variant="ghost" />
       </ScrollView>
     </View>
   )
